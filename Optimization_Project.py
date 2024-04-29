@@ -189,14 +189,6 @@ player_data['ClubPower'] = player_data['Team'].map(club_power_dict)
 #print (player_data.head())
 
 # Points Constraint
-#The objective of the game is to score the most points.
-#Points are scored through goals, assists, clean sheets and saves.
-#Points are deducted when a player receives a yellow card, red card or scores an own goal.
-#Players are priced according to their points potential. 
-#Logically, higher the price, higher the perceived points potential. 
-#For example, Erling Haaland is priced at £14.0m, while someone like 
-#Elliot Anderson is priced at £4.5m. 
-
 #The points system is as follows:
 #Goalkeepers :
 #1 point for every 3 saves
@@ -446,82 +438,6 @@ def optimize_team(player_data, budget, num_players, num_goalkeepers, num_defende
 
     return selected_goalkeepers, selected_defenders, selected_midfielders, selected_forwards
 
-'''
-def optimize_team(player_data, budget, num_players, num_goalkeepers, num_defenders, num_midfielders, num_forwards, max_players_from_same_team):
-    # Create a binary variable for each player
-    players = player_data['Player ID'].values
-    player_vars = LpVariable.dicts('Players', players, 0, 1, LpBinary)
-
-    # Create a binary variable for each goalkeeper
-    goalkeepers = player_data[player_data['Position'] == 'GK']['Player ID'].values
-    goalkeeper_vars = LpVariable.dicts('Goalkeepers', goalkeepers, 0, 1, LpBinary)
-
-    # Create a binary variable for each defender
-    defenders = player_data[player_data['Position'] == 'DEF']['Player ID'].values
-    defender_vars = LpVariable.dicts('Defenders', defenders, 0, 1, LpBinary)
-
-    # Create a binary variable for each midfielder
-    midfielders = player_data[player_data['Position'] == 'MID']['Player ID'].values
-    midfielder_vars = LpVariable.dicts('Midfielders', midfielders, 0, 1, LpBinary)
-
-    # Create a binary variable for each forward
-    forwards = player_data[player_data['Position'] == 'FWD']['Player ID'].values
-    forward_vars = LpVariable.dicts('Forwards', forwards, 0, 1, LpBinary)
-
-    # Create a binary variable for each club
-    clubs = player_data['ClubID'].unique()
-    club_vars = LpVariable.dicts('Clubs', clubs, 0, 1, LpBinary)
-
-    # Create a binary variable for each player from the same team
-    players_same_team = player_data['ClubID'].values
-    player_vars_same_team = LpVariable.dicts('Players_Same_Team', players_same_team, 0, 1, LpBinary)
-
-    # Create a binary variable for each premium player (cost > 80) and (position-specific performance index > threshold)
-    premium_players = player_data[(player_data['cost'] > 80) & (player_data['Predicted Performace index'] > 10) & (player_data['Power ranking'] > 90)]['Player ID'].values
-    premium_player_vars = LpVariable.dicts('Premium_Players', premium_players, 0, 1, LpBinary)
-    print ('Premium Players:', premium_players )
-    # Create the optimization model
-    # start by choosing the best players
-
-    model = LpProblem('OptimizeTeam', LpMaximize)
-
-   # Ensure at least one premium player is selected
-    model += lpSum([premium_player_vars[player] for player in premium_players if player in premium_player_vars]) <= 1
-
-    # Objective function maximizing cost-efficiency
-    model += lpSum([player_vars[player] * player_data.loc[player_data['Player ID'] == player, 'Cost Efficiency'].values[0] for player in players])
-    
-    # Number of players constraint
-    model += lpSum([player_vars[player] for player in players]) == num_players
-
-    # Number of goalkeepers constraint
-    model += lpSum([goalkeeper_vars[player] for player in goalkeepers]) == num_goalkeepers
-
-    # Number of defenders constraint
-    model += lpSum([defender_vars[player] for player in defenders]) == num_defenders
-
-    # Number of midfielders constraint
-    model += lpSum([midfielder_vars[player] for player in midfielders]) == num_midfielders
-
-    # Number of forwards constraint
-    model += lpSum([forward_vars[player] for player in forwards]) == num_forwards
-
-    # At least one premium player constraint
-    # Filter premium players based on cost and position-specific performance index
-
-    # Solve the optimization problem
-    model.solve()
-
-    # Extract the selected players
-
-    selected_goalkeepers = [player for player in goalkeepers if goalkeeper_vars[player].varValue == 1]
-    selected_defenders = [player for player in defenders if defender_vars[player].varValue == 1]
-    selected_midfielders = [player for player in midfielders if midfielder_vars[player].varValue == 1]
-    selected_forwards = [player for player in forwards if forward_vars[player].varValue == 1]
-
-    return selected_goalkeepers, selected_defenders, selected_midfielders, selected_forwards
-'''
-
 # Optimize the team
 selected_goalkeepers, selected_defenders, selected_midfielders, selected_forwards = optimize_team(player_data, budget, num_players, num_goalkeepers, num_defenders, num_midfielders, num_forwards, max_players_from_same_team)
 
@@ -555,3 +471,34 @@ for player in selected_forwards:
 print(f'\nTotal spent: £{player_data.loc[player_data["Player ID"].isin(selected_goalkeepers + selected_defenders + selected_midfielders + selected_forwards), "cost"].sum()}m')
 #export player data to pdf or txt
 #player_data.to_csv('selected_players.csv', index=False)
+
+#Data viewing in plots
+selected_players = player_data[player_data['Player ID'].isin(selected_goalkeepers + selected_defenders + selected_midfielders + selected_forwards)]
+# Plotting the distribution of player costs
+plt.figure(figsize=(10, 6))
+plt.hist(selected_players['cost'], bins=20, color='skyblue', edgecolor='black')
+plt.title('Distribution of Player Costs')
+plt.xlabel('Cost (£m)')
+plt.ylabel('Frequency')
+plt.show()
+
+# Plotting the cost efficiency of the chosen players in scatter plot,
+#include the actual names of selected players and actual names of players above 80 in cost
+premium_players = player_data[(player_data['cost'] > 80) & (player_data['Predicted Performace index'] > 10) & (player_data['Power ranking'] > 90)]
+plt.figure(figsize=(10, 6))
+plt.scatter(player_data['cost'], player_data['Cost Efficiency'], color='skyblue', label='All Players')
+plt.scatter(selected_players['cost'], selected_players['Cost Efficiency'], color='red', label='Selected Players')
+plt.scatter(premium_players['cost'], premium_players['Cost Efficiency'], color='green', label='Premium Players')
+
+# Annotate the selected players
+for i, player in selected_players.iterrows():
+    plt.annotate(player['Name'], (player['cost'], player['Cost Efficiency']))
+# Annotate the premium players
+for i, player in premium_players.iterrows():
+    plt.annotate(player['Name'], (player['cost'], player['Cost Efficiency']))
+
+plt.title('Cost Efficiency of Players')
+plt.xlabel('Cost (£m)')
+plt.ylabel('Cost Efficiency')
+plt.legend()
+plt.show(block = True)
